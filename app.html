@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Octopus — OSINT Araştırma Ajanı</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --abyss:#0A1620;
+    --ink:#142838;
+    --ink-2:#1B3446;
+    --bio:#4DEFD6;
+    --gold:#F2B84B;
+    --violet:#6B5CA5;
+    --foam:#E8F4F2;
+    --foam-dim:#9FB6BC;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+
+  body{
+    background:radial-gradient(ellipse at 50% 20%, #101F2A 0%, var(--abyss) 60%);
+    color:var(--foam);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  /* ambient caustic light drift */
+  body::before{
+    content:'';
+    position:fixed; inset:0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(77,239,214,0.05), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(107,92,165,0.06), transparent 45%);
+    pointer-events:none;
+    animation:drift 18s ease-in-out infinite alternate;
+  }
+  @keyframes drift{
+    0%{ transform: translate(0,0); }
+    100%{ transform: translate(-2%, 3%); }
+  }
+
+  header{
+    width:100%;
+    max-width:1100px;
+    padding:2.5rem 1.5rem 0.5rem;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--foam-dim);
+  }
+  .eyebrow b{ color:var(--bio); font-weight:500; }
+
+  main{
+    width:100%;
+    max-width:1100px;
+    padding:0 1.5rem 4rem;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:clamp(1.8rem, 4vw, 2.8rem);
+    letter-spacing:-0.01em;
+    text-align:center;
+    margin:1.2rem 0 0.4rem;
+  }
+  h1 span{ color:var(--bio); }
+
+  p.sub{
+    text-align:center;
+    color:var(--foam-dim);
+    max-width:480px;
+    margin:0 0 1.5rem;
+    font-size:0.98rem;
+    line-height:1.5;
+  }
+
+  /* ---- Octopus stage ---- */
+  .stage{
+    position:relative;
+    width:100%;
+    max-width:640px;
+    aspect-ratio:1/1;
+    margin:0.5rem auto 1rem;
+  }
+  .stage svg{
+    width:100%; height:100%;
+    display:block;
+    animation:bob 6s ease-in-out infinite;
+  }
+  @keyframes bob{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(-10px); }
+  }
+
+  .tentacle path{
+    fill:none;
+    stroke:var(--foam-dim);
+    stroke-width:9;
+    stroke-linecap:round;
+    opacity:0.55;
+    transition:stroke 0.5s ease, opacity 0.5s ease, filter 0.5s ease;
+  }
+  .tentacle.active path{
+    stroke:var(--bio);
+    opacity:1;
+    filter:drop-shadow(0 0 10px rgba(77,239,214,0.65));
+  }
+  .tentacle.found path{
+    stroke:var(--gold);
+    opacity:1;
+    filter:drop-shadow(0 0 12px rgba(242,184,75,0.6));
+  }
+
+  .node circle.dot{
+    fill:var(--ink-2);
+    stroke:var(--foam-dim);
+    stroke-width:2;
+    transition:stroke 0.4s ease, fill 0.4s ease, filter 0.4s ease;
+  }
+  .tentacle.active .node circle.dot{
+    stroke:var(--bio);
+    fill:#0F2A28;
+    filter:drop-shadow(0 0 8px rgba(77,239,214,0.7));
+  }
+  .tentacle.found .node circle.dot{
+    stroke:var(--gold);
+    fill:#2A2312;
+    filter:drop-shadow(0 0 8px rgba(242,184,75,0.7));
+  }
+
+  .node text{
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    fill:var(--foam-dim);
+    transition:fill 0.4s ease;
+  }
+  .tentacle.active .node text{ fill:var(--bio); }
+  .tentacle.found .node text{ fill:var(--gold); }
+
+  .mantle{
+    fill:var(--ink);
+    stroke:var(--foam-dim);
+    stroke-width:2;
+  }
+  .mantle.thinking{
+    stroke:var(--violet);
+    filter:drop-shadow(0 0 14px rgba(107,92,165,0.55));
+    animation:pulseMantle 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseMantle{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.75; }
+  }
+  .eye{ fill:var(--foam); }
+  .eye.blink{ animation:blink 4s ease-in-out infinite; }
+  @keyframes blink{
+    0%,92%,100%{ transform:scaleY(1); }
+    95%{ transform:scaleY(0.1); }
+  }
+  .mantle-label{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    fill:var(--foam-dim);
+    text-anchor:middle;
+    letter-spacing:0.05em;
+  }
+
+  /* ---- Search panel ---- */
+  .panel{
+    width:100%;
+    max-width:480px;
+    display:flex;
+    flex-direction:column;
+    gap:0.7rem;
+    margin-top:0.5rem;
+  }
+  .search-row{
+    display:flex;
+    gap:0.6rem;
+  }
+  input[type="text"]{
+    flex:1;
+    background:var(--ink);
+    border:1px solid #24404F;
+    color:var(--foam);
+    border-radius:10px;
+    padding:0.85rem 1rem;
+    font-family:'Inter',sans-serif;
+    font-size:0.95rem;
+    outline:none;
+    transition:border-color 0.2s ease;
+  }
+  input[type="text"]::placeholder{ color:var(--foam-dim); }
+  input[type="text"]:focus{ border-color:var(--bio); }
+
+  button.go{
+    background:var(--bio);
+    color:#052923;
+    border:none;
+    border-radius:10px;
+    padding:0.85rem 1.3rem;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:0.92rem;
+    cursor:pointer;
+    transition:transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  button.go:hover{ transform:translateY(-1px); box-shadow:0 6px 20px rgba(77,239,214,0.25); }
+  button.go:disabled{ opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  .log{
+    background:#081319;
+    border:1px solid #1D3644;
+    border-radius:10px;
+    padding:0.9rem 1rem;
+    height:150px;
+    overflow-y:auto;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.78rem;
+    line-height:1.65;
+    color:var(--foam-dim);
+    scroll-behavior:smooth;
+  }
+  .log .line{ opacity:0; animation:appear 0.4s ease forwards; }
+  .log .line.ok{ color:var(--bio); }
+  .log .line.done{ color:var(--gold); }
+  @keyframes appear{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+  .status-pill{
+    align-self:flex-start;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--foam-dim);
+    display:flex;
+    align-items:center;
+    gap:0.4rem;
+  }
+  .status-pill .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--foam-dim);
+  }
+  .status-pill.searching .dot{ background:var(--bio); box-shadow:0 0 8px var(--bio); animation:blinkDot 1s infinite; }
+  .status-pill.done .dot{ background:var(--gold); box-shadow:0 0 8px var(--gold); }
+  @keyframes blinkDot{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  footer{
+    color:var(--foam-dim);
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.7rem;
+    padding-bottom:2rem;
+    text-align:center;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow"><b>OCTOPUS</b> · osint gözlem ajanı</div>
+  <div class="eyebrow">v0.1 prototip</div>
+</header>
+
+<main>
+  <h1>Bir isim ver, <span>Octopus</span> araştırsın.</h1>
+  <p class="sub">Her kol ayrı bir kaynağı tarar. Baş (reasoning) bulunan her bilgiden yeni bir araştırma yönü çıkarır.</p>
+
+  <div class="stage">
+    <svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+      <!-- Tentacles -->
+      <g class="tentacle" data-source="GitHub">
+        <path d="M 400 320 C 370 250, 430 180, 400 100" />
+        <g class="node"><circle class="dot" cx="400" cy="100" r="24"/><text x="400" y="66" text-anchor="middle">GitHub</text></g>
+      </g>
+      <g class="tentacle" data-source="Wikipedia">
+        <path d="M 470 345 C 560 320, 600 260, 659.8 250" />
+        <g class="node"><circle class="dot" cx="659.8" cy="250" r="24"/><text x="695" y="246" text-anchor="start">Wikipedia</text></g>
+      </g>
+      <g class="tentacle" data-source="Web">
+        <path d="M 470 455 C 560 480, 600 540, 659.8 550" />
+        <g class="node"><circle class="dot" cx="659.8" cy="550" r="24"/><text x="695" y="555" text-anchor="start">Web</text></g>
+      </g>
+      <g class="tentacle" data-source="Scholar">
+        <path d="M 400 480 C 430 550, 370 620, 400 700" />
+        <g class="node"><circle class="dot" cx="400" cy="700" r="24"/><text x="400" y="738" text-anchor="middle">Scholar</text></g>
+      </g>
+      <g class="tentacle" data-source="Sirket">
+        <path d="M 330 455 C 240 480, 200 540, 140.2 550" />
+        <g class="node"><circle class="dot" cx="140.2" cy="550" r="24"/><text x="105" y="555" text-anchor="end">Şirket Kaydı</text></g>
+      </g>
+      <g class="tentacle" data-source="Haber">
+        <path d="M 330 345 C 240 320, 200 260, 140.2 250" />
+        <g class="node"><circle class="dot" cx="140.2" cy="250" r="24"/><text x="105" y="246" text-anchor="end">Haberler</text></g>
+      </g>
+
+      <!-- Mantle (Reasoning Agent) -->
+      <g>
+        <ellipse class="mantle" id="mantle" cx="400" cy="400" rx="105" ry="82"/>
+        <ellipse class="eye blink" cx="368" cy="390" rx="8" ry="10"/>
+        <ellipse class="eye blink" cx="432" cy="390" rx="8" ry="10"/>
+        <text class="mantle-label" x="400" y="440">REASONING</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="panel">
+    <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusText">Bekleniyor</span></div>
+    <div class="search-row">
+      <input type="text" id="queryInput" placeholder="ör. Elon Musk, TrustPay A.Ş..." />
+      <button class="go" id="goBtn">Araştır</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</main>
+
+<footer>octopus prototip &middot; gerçek veri yok, akış simülasyonu</footer>
+
+<script>
+const SOURCES = [
+  { key: "GitHub",   label: "GitHub taranıyor",           ok: "GitHub: 3 repo bulundu" },
+  { key: "Wikipedia",label: "Wikipedia özeti çekiliyor",   ok: "Wikipedia: özet alındı" },
+  { key: "Web",      label: "Web sayfaları taranıyor",     ok: "Web: 2 sayfa okundu" },
+  { key: "Scholar",  label: "Google Scholar sorgulanıyor", ok: "Scholar: 1 yayın bulundu" },
+  { key: "Sirket",   label: "Şirket kaydı kontrol ediliyor", ok: "Şirket kaydı: eşleşme yok" },
+  { key: "Haber",    label: "Haberler taranıyor",          ok: "Haber: 1 makale bulundu" },
+];
+
+const stage = document.querySelector(".stage svg");
+const mantle = document.getElementById("mantle");
+const logEl = document.getElementById("log");
+const pill = document.getElementById("statusPill");
+const statusText = document.getElementById("statusText");
+const goBtn = document.getElementById("goBtn");
+const input = document.getElementById("queryInput");
+
+function tentacleFor(key){
+  return document.querySelector(`.tentacle[data-source="${key}"]`);
+}
+
+function addLog(text, cls){
+  const line = document.createElement("div");
+  line.className = "line" + (cls ? " " + cls : "");
+  line.textContent = "> " + text;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function resetStage(){
+  document.querySelectorAll(".tentacle").forEach(t => t.classList.remove("active","found"));
+  mantle.classList.remove("thinking");
+  logEl.innerHTML = "";
+}
+
+async function runResearch(){
+  const q = input.value.trim() || "İsimsiz Hedef";
+  resetStage();
+  goBtn.disabled = true;
+  pill.className = "status-pill searching";
+  statusText.textContent = "Araştırılıyor";
+  addLog(`Yeni araştırma başlatıldı: ${q}`);
+
+  for (const src of SOURCES){
+    const t = tentacleFor(src.key);
+    t.classList.add("active");
+    addLog(src.label + "...");
+    await sleep(650 + Math.random()*350);
+    t.classList.remove("active");
+    t.classList.add("found");
+    addLog(src.ok, "ok");
+    await sleep(200);
+  }
+
+  mantle.classList.add("thinking");
+  addLog("Reasoning: bulgular değerlendiriliyor...");
+  await sleep(1400);
+  addLog("Reasoning: 4 yeni araştırma yönü türetildi", "done");
+  mantle.classList.remove("thinking");
+
+  pill.className = "status-pill done";
+  statusText.textContent = "Tamamlandı";
+  goBtn.disabled = false;
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+goBtn.addEventListener("click", runResearch);
+input.addEventListener("keydown", e => { if(e.key === "Enter") runResearch(); });
+</script>
+
+</body>
+</html>

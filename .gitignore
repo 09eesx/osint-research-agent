@@ -1,0 +1,16 @@
+# Sırlar
+.env
+.env.*
+!.env.example
+
+# Çıktılar ve ortam
+output/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.agents/
+
+# Web
+node_modules/
+dist/
